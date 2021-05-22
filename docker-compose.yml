@@ -1,0 +1,127 @@
+version: '3.7'
+x-common-env: 
+  &common-env
+  APP_NAME: ${APP_NAME}
+  APP_ROOT: ${APP_ROOT}
+  MYSQL_DATABASE: ${MYSQL_DATABASE}
+  MYSQL_USER: ${MYSQL_USER}
+  MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+  MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+  MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS}
+
+services:
+  php:
+    build: 
+      context: ./php
+      #dockerfile: DebianDockerfile
+      args:
+        <<: *common-env
+    image: ${APP_NAME}-php:alpine
+    container_name: ${APP_NAME}-php
+    #restart: always
+    environment:
+      <<: *common-env
+      NON_COMMON_ENV: 'non_common_env'
+    depends_on:
+      - mysql
+      - redis
+    volumes:
+      - ./volumes/src:${APP_ROOT}/
+    networks:
+      app_net: 
+        ipv4_address: 192.168.20.10
+
+  node:
+    build: 
+      context: ./node
+      args:
+        <<: *common-env
+
+    image: ${APP_NAME}-node:alpine
+    container_name: ${APP_NAME}-node
+    working_dir: $APP_ROOT/${APP_NAME}
+    tty: true
+    depends_on:
+      - redis
+    volumes:
+      - ./volumes/src:${APP_ROOT}
+      - npmCache:/root/.npm
+      - sslCerts:/etc/nginx/conf.d/ssl
+    networks:
+      app_net: 
+        ipv4_address: 192.168.20.11
+
+  mysql:
+    build: ./mysql
+    image: ${APP_NAME}-mysql:alpine
+    container_name: ${APP_NAME}-mysql
+    #restart: always
+    environment: 
+      <<: *common-env
+    volumes:
+      - database:/var/lib/mysql
+    networks:
+      app_net: 
+        ipv4_address: 192.168.20.12
+
+  nginx:
+    build: 
+      context: ./nginx
+      args:
+        <<: *common-env
+    image: ${APP_NAME}-nginx:alpine
+    container_name: ${APP_NAME}-nginx
+    restart: always
+    ports:
+      - 80:80
+      - 443:443
+    environment:
+      <<: *common-env
+      TESTENV: "TESTENV"
+      NON_COMMON_ENV: non_common_envnginx
+    depends_on:
+      - php
+      - node
+    volumes:
+      #- ./nginx/files/vhost.conf:/etc/nginx/conf.d/vhost.conf
+      - ./volumes/src:${APP_ROOT}
+      - sslCerts:/etc/nginx/conf.d/ssl
+      #- ./volumes/nginx/etc/nginx/conf.d:/etc/nginx/conf.d
+    networks:
+      app_net: 
+        ipv4_address: 192.168.20.13
+
+  redis:
+    build: ./redis
+    image: ${APP_NAME}-redis:alpine
+    container_name: ${APP_NAME}-redis
+    networks:
+      app_net: 
+        ipv4_address: 192.168.20.14
+  
+  mailhog:
+    image: mailhog/mailhog
+    container_name: ${APP_NAME}-mailhog
+    ports:
+      - 8025:8025
+    networks:
+      app_net: 
+        ipv4_address: 192.168.20.15
+
+volumes:
+  database:
+  npmCache:
+    driver: local
+  sslCerts:
+    driver: local
+  #phpsocket: "/var/run/"
+
+networks:
+  app_net:
+    name: ${APP_NAME}_net
+    driver: bridge
+    ipam:
+     driver: default
+     config:
+       - subnet: 192.168.20.0/24
+         gateway: 192.168.20.1
