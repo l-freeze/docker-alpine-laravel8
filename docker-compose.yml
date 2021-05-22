@@ -110,9 +110,12 @@ services:
 
 volumes:
   database:
+    name: ${APP_NAME}-database
   npmCache:
+    name: ${APP_NAME}-npmCache
     driver: local
   sslCerts:
+    name: ${APP_NAME}-sslCerts
     driver: local
   #phpsocket: "/var/run/"
 
