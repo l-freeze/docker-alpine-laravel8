@@ -41,6 +41,7 @@ RUN apk update && apk add \
         zstd-dev \
         vim \
         git \
+        openssh \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j$(nproc) gd pdo_mysql opcache \
     && pecl install zstd \
